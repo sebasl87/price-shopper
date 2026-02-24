@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Price Shopper · Booking.com</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:       #0a0c10;
+    --surface:  #111318;
+    --surface2: #1a1d24;
+    --border:   #252830;
+    --border2:  #2e3340;
+    --text:     #e8eaf0;
+    --muted:    #6b7280;
+    --dim:      #9ca3af;
+    --yellow:   #f0b429;
+    --green:    #34d399;
+    --blue:     #60a5fa;
+    --red:      #f87171;
+    --mono:     'Space Mono', monospace;
+    --sans:     'DM Sans', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; font-size: 14px; line-height: 1.5; }
+
+  /* ── HEADER ── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 52px;
+    border-bottom: 1px solid var(--border); background: var(--surface);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .12em; color: var(--yellow); text-transform: uppercase; }
+  .logo span { color: var(--muted); font-weight: 400; margin-left: 6px; }
+  .status { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); transition: background .3s; }
+  .dot.ok   { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+  .dot.busy { background: var(--yellow); animation: pulse .7s infinite; }
+  .dot.err  { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ── LAYOUT ── */
+  .app { display: grid; grid-template-columns: 300px 1fr; min-height: calc(100vh - 52px); }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    background: var(--surface); border-right: 1px solid var(--border);
+    padding: 18px 16px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .sec-title {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .15em;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+  }
+  label { display: block; font-size: 10px; color: var(--muted); margin-bottom: 4px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+  input, select {
+    width: 100%; background: var(--bg); border: 1px solid var(--border2);
+    color: var(--text); padding: 7px 10px; border-radius: 4px;
+    font-family: var(--mono); font-size: 12px; outline: none;
+    transition: border-color .2s; margin-bottom: 12px;
+  }
+  input:focus, select:focus { border-color: var(--yellow); }
+  input::placeholder { color: var(--muted); opacity: .5; }
+
+  /* Hotel cards */
+  .hotel-card { background: var(--bg); border: 1px solid var(--border2); border-radius: 6px; padding: 10px; margin-bottom: 8px; }
+  .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .color-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .card-label { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
+  .hotel-card input { margin-bottom: 6px; }
+  .hotel-card input:last-child { margin-bottom: 0; }
+
+  /* Buttons */
+  .btn { width: 100%; padding: 10px; border: none; border-radius: 4px; font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; transition: all .2s; }
+  .btn-primary { background: var(--yellow); color: var(--bg); }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-stop { background: var(--red); color: #fff; }
+  .btn-secondary { background: transparent; border: 1px solid var(--border2); color: var(--dim); margin-top: 7px; }
+  .btn-secondary:hover { border-color: var(--muted); color: var(--text); }
+
+  /* Progress */
+  .progress-wrap { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; }
+  .progress-header { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--muted); margin-bottom: 7px; }
+  .progress-track { background: var(--surface2); border-radius: 2px; height: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--yellow); border-radius: 2px; transition: width .3s ease; }
+  .log-area { margin-top: 8px; max-height: 140px; overflow-y: auto; font-family: var(--mono); font-size: 10px; line-height: 1.9; }
+  .log-ok   { color: var(--green); }
+  .log-err  { color: var(--red); }
+  .log-info { color: var(--blue); }
+  .log-warn { color: var(--yellow); }
+
+  /* Notice */
+  .notice { background: #1a1500; border: 1px solid #3d2e00; border-radius: 6px; padding: 9px 12px; font-size: 11px; color: #d4a017; line-height: 1.6; margin-bottom: 8px; }
+  .notice strong { color: var(--yellow); }
+  .notice code { background: rgba(255,255,255,.08); padding: 1px 4px; border-radius: 3px; font-family: var(--mono); font-size: 10px; }
+
+  /* ── MAIN ── */
+  .main { display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Stats bar */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--border); }
+  .stat { padding: 14px 20px; border-right: 1px solid var(--border); }
+  .stat:last-child { border-right: none; }
+  .stat-label { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .stat-value { font-family: var(--mono); font-size: 22px; font-weight: 700; line-height: 1; }
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .chip { display: inline-block; padding: 2px 6px; border-radius: 3px; font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+  .chip-demo { background: #3d2e00; color: #d4a017; }
+  .chip-live { background: #0d3320; color: var(--green); }
+
+  /* Chart area */
+  .content { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; }
+  .panel-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+  .panel-title-sm { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+  .panel-title { font-size: 15px; font-weight: 600; color: var(--text); margin-top: 2px; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--dim); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+  canvas { max-height: 280px; }
+
+  /* Table */
+  .table-header { padding: 12px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .table-title { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+  .table-controls { display: flex; gap: 6px; }
+  .filter-btn { padding: 4px 10px; background: transparent; border: 1px solid var(--border2); border-radius: 3px; font-family: var(--mono); font-size: 10px; color: var(--muted); cursor: pointer; text-transform: uppercase; transition: all .15s; }
+  .filter-btn.active { background: var(--yellow); color: var(--bg); border-color: var(--yellow); }
+  .filter-btn:hover:not(.active) { color: var(--text); border-color: var(--muted); }
+  .export-btn { padding: 4px 10px; background: transparent; border: 1px solid var(--border2); border-radius: 3px; font-family: var(--mono); font-size: 10px; color: var(--muted); cursor: pointer; text-transform: uppercase; transition: all .15s; }
+  .export-btn:hover { color: var(--text); border-color: var(--muted); }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  thead tr { background: var(--surface2); border-bottom: 1px solid var(--border); }
+  th { padding: 9px 14px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); white-space: nowrap; font-weight: 400; }
+  th.r { text-align: right; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody tr.weekend { background: rgba(240,180,41,.025); }
+  td { padding: 8px 14px; white-space: nowrap; }
+  td.muted { color: var(--dim); }
+  td.wk { color: var(--yellow); }
+  td.r { text-align: right; }
+  td.best { color: var(--green); font-weight: 700; }
+  td.normal { font-weight: 700; }
+  td.na { color: var(--muted); font-weight: 400; }
+  td.spread { color: var(--yellow); font-weight: 700; text-align: right; }
+
+  /* Empty state */
+  .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center; color: var(--muted); flex: 1; }
+  .empty-icon { font-size: 48px; opacity: .3; margin-bottom: 16px; }
+  .empty h3 { font-family: var(--mono); font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--dim); margin-bottom: 8px; }
+  .empty p { font-size: 13px; max-width: 320px; line-height: 1.7; }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Price Shopper <span>· Booking.com</span></div>
+  <div class="status">
+    <div class="dot" id="dot"></div>
+    <span id="statusTxt">Listo para consultar</span>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <div>
+      <div class="sec-title">Configuración</div>
+      <div class="notice">
+        Las llamadas a la API se hacen desde el <strong>servidor Vercel</strong> — sin problemas de CORS. La API key se guarda solo en las variables de entorno del servidor, nunca en el browser.
+      </div>
+
+      <label>Moneda</label>
+      <select id="currency">
+        <option value="USD">USD — Dólar</option>
+        <option value="EUR">EUR — Euro</option>
+        <option value="ARS">ARS — Peso ARG</option>
+        <option value="BRL">BRL — Real</option>
+        <option value="MXN">MXN — Peso MEX</option>
+      </select>
+
+      <label>Adultos / habitación</label>
+      <select id="adults">
+        <option value="2" selected>2 adultos (doble)</option>
+        <option value="1">1 adulto (single)</option>
+      </select>
+
+      <label>Días a consultar</label>
+      <input type="number" id="daysRange" value="90" min="7" max="180">
+    </div>
+
+    <!-- Hotels -->
+    <div>
+      <div class="sec-title">Hoteles (hasta 4)</div>
+      <div id="hotelCards"></div>
+      <div class="notice" style="margin-top:8px;">
+        <strong>¿Cómo encontrar el Hotel ID?</strong><br>
+        Abrí el hotel en Booking.com → Ctrl+U (fuente) → buscá <code>hotel_id</code>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="btn btn-primary" id="fetchBtn" onclick="startFetch()">▶ Iniciar consulta</button>
+      <button class="btn btn-stop" id="stopBtn" onclick="stopFetch()" style="display:none;">■ Detener</button>
+      <button class="btn btn-secondary" onclick="loadDemo()">← Datos demo</button>
+    </div>
+
+    <!-- Progress -->
+    <div id="progressWrap" style="display:none;">
+      <div class="progress-wrap">
+        <div class="progress-header">
+          <span id="progLabel">Iniciando...</span>
+          <span id="progPct">0%</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="progFill" style="width:0%"></div></div>
+        <div class="log-area" id="logArea"></div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Tarifa más baja</div><div class="stat-value" id="sMin">—</div><div class="stat-sub" id="sMinSub">—</div></div>
+      <div class="stat"><div class="stat-label">Tarifa más alta</div><div class="stat-value" id="sMax">—</div><div class="stat-sub" id="sMaxSub">—</div></div>
+      <div class="stat"><div class="stat-label">Promedio general</div><div class="stat-value" id="sAvg">—</div><div class="stat-sub">todos los hoteles</div></div>
+      <div class="stat"><div class="stat-label">Noches cargadas</div><div class="stat-value" id="sDays">—</div><div class="stat-sub" id="sMode">—</div></div>
+    </div>
+
+    <!-- Content -->
+    <div class="content" id="content">
+      <div class="empty" id="emptyState">
+        <div class="empty-icon">📊</div>
+        <h3>Sin datos aún</h3>
+        <p>Completá los Hotel IDs y presioná <strong>Iniciar consulta</strong>. La API key ya está configurada en el servidor.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────────────────
+const COLORS   = ['#f0b429','#34d399','#60a5fa','#f87171'];
+const CUR_SYM  = { USD:'$', EUR:'€', ARS:'$', BRL:'R$', MXN:'$' };
+const DAYS_ES  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+
+// Default hotels — Ushuaia
+const DEFAULT_HOTELS = [
+  { name: 'Lennox Hotel Ushuaia',      id: '186029' },
+  { name: 'Canal Beagle Ushuaia',      id: '' },
+  { name: 'Hotel Albatros Ushuaia',    id: '' },
+  { name: 'Cilene del Fuego Ushuaia',  id: '' },
+];
+
+// ─── STATE ───────────────────────────────────────────────────
+let state = { hotels: [], results: [], currency: 'USD', isDemo: false, chart: null, filter: 'all', abort: false };
+
+// ─── INIT ────────────────────────────────────────────────────
+(function init() {
+  renderHotelCards();
+})();
+
+function renderHotelCards() {
+  const wrap = document.getElementById('hotelCards');
+  wrap.innerHTML = DEFAULT_HOTELS.map((h, i) => `
+    <div class="hotel-card">
+      <div class="card-header">
+        <div class="color-dot" style="background:${COLORS[i]}"></div>
+        <div class="card-label">Hotel ${['A','B','C','D'][i]}</div>
+      </div>
+      <label>Nombre</label>
+      <input type="text" class="h-name" data-i="${i}" value="${h.name}" placeholder="Nombre del hotel">
+      <label>Hotel ID</label>
+      <input type="text" class="h-id" data-i="${i}" value="${h.id}" placeholder="ej: 186029" style="font-family:var(--mono)">
+    </div>
+  `).join('');
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────
+function getDates(n) {
+  const dates = []; const today = new Date(); today.setHours(0,0,0,0);
+  for (let i = 1; i <= n; i++) { const d = new Date(today); d.setDate(today.getDate()+i); dates.push(d.toISOString().split('T')[0]); }
+  return dates;
+}
+function fmtDate(s) { return new Date(s+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'short'}); }
+function isWeekend(s) { const d = new Date(s+'T00:00:00'); return d.getDay()===0||d.getDay()===6; }
+function fmtPrice(p) { return p==null?'—':(CUR_SYM[state.currency]||'$')+p.toLocaleString(); }
+function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
+
+function setStatus(mode, txt) {
+  const dot = document.getElementById('dot');
+  dot.className = 'dot' + (mode?' '+mode:'');
+  document.getElementById('statusTxt').textContent = txt;
+}
+
+function addLog(msg, type='') {
+  const area = document.getElementById('logArea');
+  if (!area) return;
+  area.innerHTML += `<div class="log-${type}">${msg}</div>`;
+  area.scrollTop = area.scrollHeight;
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progFill').style.width = pct+'%';
+  document.getElementById('progPct').textContent  = pct+'%';
+  if (label) document.getElementById('progLabel').textContent = label;
+}
+
+function extractPrice(data) {
+  const root   = Array.isArray(data) ? data[0] : data;
+  const blocks = root?.block ?? [];
+  let min = null;
+  for (const b of blocks) {
+    const p = b?.min_price?.price ?? b?.product_price_breakdown?.gross_amount?.value ?? b?.price_breakdown?.gross_price ?? null;
+    if (p != null) { const v = parseFloat(p); if (!isNaN(v) && (min===null||v<min)) min=v; }
+  }
+  return min!=null ? Math.round(min) : null;
+}
+
+// ─── DEMO ────────────────────────────────────────────────────
+function loadDemo() {
+  const names = ['Lennox Hotel','Canal Beagle','Hotel Albatros','Cilene del Fuego'];
+  const bases  = [180, 140, 120, 200];
+  const dates  = getDates(90);
+  state.results = names.map((name,i)=>({
+    name, id:'demo',
+    prices: dates.map((date,j)=>{
+      const s=(Math.sin(j/90*Math.PI)*0.25), n=(Math.random()-.5)*.18, w=isWeekend(date)?.12:0;
+      return { date, price: Math.max(Math.round(bases[i]*(1+s+n+w)),60) };
+    })
+  }));
+  state.currency = document.getElementById('currency').value;
+  state.isDemo   = true;
+  setStatus('ok','Datos demo cargados');
+  renderDashboard();
+}
+
+// ─── FETCH ───────────────────────────────────────────────────
+async function startFetch() {
+  const names  = [...document.querySelectorAll('.h-name')].map(e=>e.value.trim());
+  const ids    = [...document.querySelectorAll('.h-id')].map(e=>e.value.trim());
+  const days   = parseInt(document.getElementById('daysRange').value)||90;
+  const adults = document.getElementById('adults').value;
+  state.currency = document.getElementById('currency').value;
+
+  const hotels = ids.map((id,i)=>({id,name:names[i]||'Hotel '+(i+1)})).filter(h=>h.id);
+  if (!hotels.length) { alert('Ingresá al menos 1 Hotel ID'); return; }
+
+  state.abort   = false;
+  state.results = [];
+  state.isDemo  = false;
+
+  document.getElementById('fetchBtn').style.display = 'none';
+  document.getElementById('stopBtn').style.display  = 'block';
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('logArea').innerHTML = '';
+  document.getElementById('emptyState')?.remove();
+  document.getElementById('content').innerHTML = '<div class="empty" id="emptyState"><div class="empty-icon">⏳</div><h3>Consultando API...</h3></div>';
+
+  setStatus('busy','Consultando...');
+  setProgress(0, 'Iniciando...');
+
+  const dates = getDates(days);
+  const total = hotels.length * dates.length;
+  let done    = 0;
+
+  for (const hotel of hotels) {
+    if (state.abort) break;
+    const prices = [];
+    addLog(`Iniciando: ${hotel.name}`, 'info');
+    setProgress(Math.round(done/total*100), `Hotel: ${hotel.name}`);
+
+    for (let i = 0; i < dates.length; i++) {
+      if (state.abort) break;
+      const checkIn  = dates[i];
+      const d2       = new Date(checkIn+'T00:00:00'); d2.setDate(d2.getDate()+1);
+      const checkOut = d2.toISOString().split('T')[0];
+
+      try {
+        // ↓ Calls our Vercel proxy — no CORS, API key stays server-side
+        const url = `/api/rooms?hotel_id=${hotel.id}&arrival_date=${checkIn}&departure_date=${checkOut}&rec_guest_qty=${adults}&currency_code=${state.currency}`;
+        const resp  = await fetch(url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data  = await resp.json();
+        const price = extractPrice(data);
+        prices.push({ date: checkIn, price });
+        addLog(`✓ ${fmtDate(checkIn)} → ${fmtPrice(price)}`, price!=null?'ok':'warn');
+      } catch(e) {
+        prices.push({ date: checkIn, price: null });
+        addLog(`✗ ${fmtDate(checkIn)} → ${e.message}`, 'err');
+      }
+
+      done++;
+      setProgress(Math.round(done/total*100));
+      await sleep(150); // respeta rate limit: ~6 req/s < límite de 5/s con margen
+    }
+
+    state.results.push({ name: hotel.name, id: hotel.id, prices });
+    renderDashboard(); // actualiza gráfico después de cada hotel
+  }
+
+  document.getElementById('fetchBtn').style.display = 'block';
+  document.getElementById('stopBtn').style.display  = 'none';
+  setStatus(state.abort?'':'ok', state.abort?'Detenido':'Listo · '+state.results.length+' hoteles · '+days+' días');
+}
+
+function stopFetch() {
+  state.abort = true;
+  document.getElementById('fetchBtn').style.display = 'block';
+  document.getElementById('stopBtn').style.display  = 'none';
+  setStatus('','Detenido por el usuario');
+}
+
+// ─── DASHBOARD ───────────────────────────────────────────────
+function renderDashboard() {
+  const r = state.results; if (!r.length) return;
+  const sym = CUR_SYM[state.currency]||'$';
+  const allP = r.flatMap(h=>h.prices.filter(p=>p.price!=null).map(p=>({...p,hotel:h.name})));
+
+  if (allP.length) {
+    const sorted = [...allP].sort((a,b)=>a.price-b.price);
+    const min=sorted[0], max=sorted[sorted.length-1], avg=Math.round(allP.reduce((s,p)=>s+p.price,0)/allP.length);
+    document.getElementById('sMin').innerHTML = `<span style="font-size:13px;color:var(--muted)">${sym}</span>${min.price.toLocaleString()}`;
+    document.getElementById('sMinSub').textContent = min.hotel.split(' ')[0]+' · '+fmtDate(min.date);
+    document.getElementById('sMax').innerHTML = `<span style="font-size:13px;color:var(--muted)">${sym}</span>${max.price.toLocaleString()}`;
+    document.getElementById('sMaxSub').textContent = max.hotel.split(' ')[0]+' · '+fmtDate(max.date);
+    document.getElementById('sAvg').innerHTML = `<span style="font-size:13px;color:var(--muted)">${sym}</span>${avg.toLocaleString()}`;
+    document.getElementById('sDays').textContent = r[0]?.prices.length||0;
+    document.getElementById('sMode').innerHTML = state.isDemo?'<span class="chip chip-demo">Demo</span>':'<span class="chip chip-live">Live</span>';
+  }
+
+  const content = document.getElementById('content');
+  content.innerHTML = `
+    <div class="panel">
+      <div class="panel-header">
+        <div><div class="panel-title-sm">Comparativa de tarifas</div><div class="panel-title">Tarifa por noche · Habitación doble</div></div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <canvas id="myChart"></canvas>
+    </div>
+    <div class="panel" style="padding:0;">
+      <div class="table-header">
+        <div class="table-title">Detalle por fecha</div>
+        <div class="table-controls">
+          <button class="filter-btn active" onclick="setFilter('all',this)">Todos</button>
+          <button class="filter-btn" onclick="setFilter('weekday',this)">Lun–Vie</button>
+          <button class="filter-btn" onclick="setFilter('weekend',this)">Fin semana</button>
+          <button class="export-btn" onclick="exportCSV()">⬇ CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap"><table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table></div>
+    </div>`;
+
+  buildLegend(); buildChart(); buildTable();
+}
+
+function buildLegend() {
+  document.getElementById('legend').innerHTML = state.results.map((h,i)=>
+    `<div class="legend-item"><div class="legend-dot" style="background:${COLORS[i]}"></div>${h.name.split(' ').slice(0,2).join(' ')}</div>`
+  ).join('');
+}
+
+function buildChart() {
+  const ctx = document.getElementById('myChart');
+  if (!ctx) return;
+  if (state.chart) { state.chart.destroy(); state.chart=null; }
+  const sym   = CUR_SYM[state.currency]||'$';
+  const dates = state.results[0]?.prices.map(p=>p.date)||[];
+  state.chart = new Chart(ctx, {
+    type:'line',
+    data: {
+      labels: dates.map(d=>fmtDate(d)),
+      datasets: state.results.map((h,i)=>({
+        label:h.name, data:h.prices.map(p=>p.price),
+        borderColor:COLORS[i], backgroundColor:COLORS[i]+'18',
+        borderWidth:1.5, pointRadius:0, pointHoverRadius:4, tension:.3, fill:false
+      }))
+    },
+    options: {
+      responsive:true, maintainAspectRatio:true,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#1a1d24', borderColor:'#2e3340', borderWidth:1,
+          titleColor:'#9ca3af', bodyColor:'#e8eaf0',
+          titleFont:{family:"'Space Mono',monospace",size:10},
+          bodyFont:{family:"'Space Mono',monospace",size:11},
+          callbacks:{
+            title:items=>items[0].label,
+            label:item=>` ${item.dataset.label}: ${item.parsed.y!=null?(sym+item.parsed.y.toLocaleString()):'—'}`
+          }
+        }
+      },
+      scales:{
+        x:{ grid:{color:'#1a1d24'}, ticks:{color:'#6b7280',font:{family:"'Space Mono',monospace",size:9},maxTicksLimit:12}, border:{color:'#252830'} },
+        y:{ grid:{color:'#1a1d24'}, ticks:{color:'#6b7280',font:{family:"'Space Mono',monospace",size:10},callback:v=>sym+v.toLocaleString()}, border:{color:'#252830'} }
+      }
+    }
+  });
+}
+
+function buildTable() {
+  const r     = state.results; if (!r.length) return;
+  const thead = document.getElementById('thead');
+  const tbody = document.getElementById('tbody');
+  const sym   = CUR_SYM[state.currency]||'$';
+  const dates = r[0].prices.map(p=>p.date);
+
+  thead.innerHTML = `<th>Fecha</th><th>Día</th>`+
+    r.map((h,i)=>`<th class="r" style="color:${COLORS[i]}">${h.name.split(' ').slice(0,3).join(' ')}</th>`).join('')+
+    (r.length>1?`<th class="r">Spread</th>`:'');
+
+  const filtered = dates.filter(d=>{
+    if (state.filter==='weekend') return isWeekend(d);
+    if (state.filter==='weekday') return !isWeekend(d);
+    return true;
+  });
+
+  tbody.innerHTML = filtered.map(date=>{
+    const wk     = isWeekend(date);
+    const day    = new Date(date+'T00:00:00').getDay();
+    const prices = r.map(h=>h.prices.find(p=>p.date===date)?.price??null);
+    const valid  = prices.filter(p=>p!=null);
+    const minP   = valid.length?Math.min(...valid):null;
+    const maxP   = valid.length?Math.max(...valid):null;
+    const spread = valid.length>1?maxP-minP:null;
+    return `<tr class="${wk?'weekend':''}">
+      <td class="muted">${fmtDate(date)}</td>
+      <td class="${wk?'wk':'muted'}">${DAYS_ES[day]}</td>
+      ${prices.map(p=>`<td class="r ${p==null?'na':p===minP&&valid.length>1?'best':'normal'}">${p!=null?sym+p.toLocaleString():'—'}</td>`).join('')}
+      ${r.length>1?`<td class="spread">${spread!=null?sym+spread.toLocaleString():'—'}</td>`:''}
+    </tr>`;
+  }).join('');
+}
+
+function setFilter(mode, btn) {
+  state.filter = mode;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  buildTable();
+}
+
+function exportCSV() {
+  const r=state.results, dates=r[0]?.prices.map(p=>p.date)||[];
+  let csv=`Fecha,${r.map(h=>`${h.name} (${state.currency})`).join(',')},Spread\n`;
+  dates.forEach(d=>{
+    const prices=r.map(h=>h.prices.find(p=>p.date===d)?.price??'');
+    const valid=prices.filter(p=>p!=='');
+    const sp=valid.length>1?Math.max(...valid)-Math.min(...valid):'';
+    csv+=`${d},${prices.join(',')},${sp}\n`;
+  });
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=`price-shopper-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+</script>
+</body>
+</html>

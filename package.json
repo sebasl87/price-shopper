@@ -1,0 +1,11 @@
+{
+  "name": "hotel-price-shopper",
+  "version": "1.0.0",
+  "description": "Hotel price comparison dashboard powered by Booking.com API",
+  "scripts": {
+    "build": "echo 'Static site - no build needed'"
+  },
+  "devDependencies": {
+    "vercel": "^37.0.0"
+  }
+}
