@@ -258,16 +258,17 @@
 
 <script>
 // ─── CONFIG ──────────────────────────────────────────────────
-const COLORS   = ['#f0b429','#34d399','#60a5fa','#f87171'];
+const COLORS   = ['#f0b429','#34d399','#60a5fa','#f87171', '#a78bfa'];
 const CUR_SYM  = { USD:'$', EUR:'€', ARS:'$', BRL:'R$', MXN:'$' };
 const DAYS_ES  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 
-// Default hotels — Ushuaia
+// Default hotels — Ushuaia (1 Propio + 4 Competencia)
 const DEFAULT_HOTELS = [
-  { name: 'Lennox Hotel Ushuaia',      id: '186029' },
-  { name: 'Canal Beagle Ushuaia',      id: '' },
-  { name: 'Hotel Albatros Ushuaia',    id: '' },
-  { name: 'Cilene del Fuego Ushuaia',  id: '' },
+  { name: 'Lennox Hotel (Mi Hotel)',   id: '186029' },
+  { name: 'Canal Beagle Ushuaia',      id: '8017079' },
+  { name: 'Hotel Albatros Ushuaia',    id: '191446' },
+  { name: 'Cilene del Fuego Ushuaia',  id: '186028' },
+  { name: 'Los Cauquenes Resort',      id: '23805' },
 ];
 
 // ─── STATE ───────────────────────────────────────────────────
@@ -276,20 +277,21 @@ let state = { hotels: [], results: [], currency: 'USD', isDemo: false, chart: nu
 // ─── INIT ────────────────────────────────────────────────────
 (function init() {
   renderHotelCards();
+  checkCacheAndLoad();
 })();
 
 function renderHotelCards() {
   const wrap = document.getElementById('hotelCards');
   wrap.innerHTML = DEFAULT_HOTELS.map((h, i) => `
-    <div class="hotel-card">
+    <div class="hotel-card" ${i===0 ? 'style="border-color:var(--yellow);background:rgba(240,180,41,0.05)"' : ''}>
       <div class="card-header">
         <div class="color-dot" style="background:${COLORS[i]}"></div>
-        <div class="card-label">Hotel ${['A','B','C','D'][i]}</div>
+        <div class="card-label">${i===0 ? '★ MI HOTEL' : 'COMPETENCIA ' + i}</div>
       </div>
       <label>Nombre</label>
-      <input type="text" class="h-name" data-i="${i}" value="${h.name}" placeholder="Nombre del hotel">
+      <input type="text" class="h-name" data-i="${i}" value="${h.name}" readonly style="opacity:0.7;cursor:default">
       <label>Hotel ID</label>
-      <input type="text" class="h-id" data-i="${i}" value="${h.id}" placeholder="ej: 186029" style="font-family:var(--mono)">
+      <input type="text" class="h-id" data-i="${i}" value="${h.id}" readonly style="font-family:var(--mono);opacity:0.7;cursor:default">
     </div>
   `).join('');
 }
@@ -335,10 +337,55 @@ function extractPrice(data) {
   return min!=null ? Math.round(min) : null;
 }
 
+// ─── CACHE ───────────────────────────────────────────────────
+const CACHE_KEY = 'price_shopper_data';
+
+function checkCacheAndLoad() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (data.date === today && data.results && data.results.length > 0) {
+      state.results = data.results;
+      state.currency = data.currency || 'USD';
+      // Restaurar selectores si es necesario, o simplemente renderizar
+      document.getElementById('currency').value = state.currency;
+      
+      setStatus('ok', 'Datos cargados del caché (hoy)');
+      renderDashboard();
+      
+      // Ocultar botón de fetch si ya tenemos datos de hoy (opcional, o mostrar aviso)
+      const btn = document.getElementById('fetchBtn');
+      btn.innerText = '✓ Datos de hoy cargados';
+      btn.disabled = true;
+      
+      // Mostrar timestamp si existe
+      if (data.timestamp) {
+        document.getElementById('statusTxt').textContent += ` · ${new Date(data.timestamp).toLocaleTimeString()}`;
+      }
+    }
+  } catch (e) {
+    console.error('Cache error', e);
+  }
+}
+
+function saveToCache(results) {
+  const today = new Date().toISOString().split('T')[0];
+  const data = {
+    date: today,
+    timestamp: new Date().getTime(),
+    currency: state.currency,
+    results: results
+  };
+  localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+}
+
 // ─── DEMO ────────────────────────────────────────────────────
 function loadDemo() {
-  const names = ['Lennox Hotel','Canal Beagle','Hotel Albatros','Cilene del Fuego'];
-  const bases  = [180, 140, 120, 200];
+  const names = ['Lennox (Mi Hotel)','Canal Beagle','Hotel Albatros','Cilene del Fuego', 'Los Cauquenes'];
+  const bases  = [180, 140, 120, 200, 250];
   const dates  = getDates(90);
   state.results = names.map((name,i)=>({
     name, id:'demo',
@@ -355,14 +402,25 @@ function loadDemo() {
 
 // ─── FETCH ───────────────────────────────────────────────────
 async function startFetch() {
-  const names  = [...document.querySelectorAll('.h-name')].map(e=>e.value.trim());
-  const ids    = [...document.querySelectorAll('.h-id')].map(e=>e.value.trim());
+  // Check cache first (redundancia por si hacen click manual)
+  const today = new Date().toISOString().split('T')[0];
+  const cachedRaw = localStorage.getItem(CACHE_KEY);
+  if (cachedRaw) {
+    const c = JSON.parse(cachedRaw);
+    if (c.date === today && c.results.length > 0) {
+      alert('Ya existen datos para el día de hoy. Se mostrarán los datos guardados.');
+      checkCacheAndLoad();
+      return;
+    }
+  }
+
+  // Usar DEFAULT_HOTELS en lugar de leer inputs
   const days   = parseInt(document.getElementById('daysRange').value)||90;
   const adults = document.getElementById('adults').value;
   state.currency = document.getElementById('currency').value;
 
-  const hotels = ids.map((id,i)=>({id,name:names[i]||'Hotel '+(i+1)})).filter(h=>h.id);
-  if (!hotels.length) { alert('Ingresá al menos 1 Hotel ID'); return; }
+  const hotels = DEFAULT_HOTELS.filter(h => h.id); // Solo los que tengan ID configurado
+  if (!hotels.length) { alert('No hay IDs de hoteles configurados en el código.'); return; }
 
   state.abort   = false;
   state.results = [];
@@ -419,6 +477,7 @@ async function startFetch() {
 
   document.getElementById('fetchBtn').style.display = 'block';
   document.getElementById('stopBtn').style.display  = 'none';
+  if (!state.abort) saveToCache(state.results);
   setStatus(state.abort?'':'ok', state.abort?'Detenido':'Listo · '+state.results.length+' hoteles · '+days+' días');
 }
 
