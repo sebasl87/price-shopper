@@ -68,13 +68,24 @@
   input:focus, select:focus { border-color: var(--yellow); }
   input::placeholder { color: var(--muted); opacity: .5; }
 
-  /* Hotel cards */
-  .hotel-card { background: var(--bg); border: 1px solid var(--border2); border-radius: 6px; padding: 10px; margin-bottom: 8px; }
-  .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  /* Hotel static cards */
+  .hotel-static {
+    background: var(--bg); border: 1px solid var(--border2);
+    border-radius: 6px; padding: 8px 12px; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .hotel-static.mine { border-color: rgba(240,180,41,.35); }
+  .hotel-static-info { flex: 1; min-width: 0; overflow: hidden; }
+  .hotel-static-name { font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hotel-static-id { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .hotel-badge {
+    font-family: var(--mono); font-size: 9px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase;
+    padding: 2px 6px; border-radius: 3px; white-space: nowrap; flex-shrink: 0;
+  }
+  .badge-mine { background: rgba(240,180,41,.15); color: var(--yellow); }
+  .badge-comp { background: var(--surface2); color: var(--muted); }
   .color-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-  .card-label { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
-  .hotel-card input { margin-bottom: 6px; }
-  .hotel-card input:last-child { margin-bottom: 0; }
 
   /* Buttons */
   .btn { width: 100%; padding: 10px; border: none; border-radius: 4px; font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; transition: all .2s; }
@@ -82,7 +93,7 @@
   .btn-primary:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
   .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
   .btn-stop { background: var(--red); color: #fff; }
-  .btn-secondary { background: transparent; border: 1px solid var(--border2); color: var(--dim); margin-top: 7px; }
+  .btn-secondary { background: transparent; border: 1px solid var(--border2); color: var(--dim); margin-top: 0; }
   .btn-secondary:hover { border-color: var(--muted); color: var(--text); }
 
   /* Progress */
@@ -100,6 +111,14 @@
   .notice { background: #1a1500; border: 1px solid #3d2e00; border-radius: 6px; padding: 9px 12px; font-size: 11px; color: #d4a017; line-height: 1.6; margin-bottom: 8px; }
   .notice strong { color: var(--yellow); }
   .notice code { background: rgba(255,255,255,.08); padding: 1px 4px; border-radius: 3px; font-family: var(--mono); font-size: 10px; }
+
+  /* Cache notice */
+  .cache-notice {
+    background: #091520; border: 1px solid #1a3a55;
+    border-radius: 6px; padding: 9px 12px;
+    font-size: 11px; color: var(--blue); line-height: 1.7;
+  }
+  .cache-notice strong { color: #93c5fd; }
 
   /* ── MAIN ── */
   .main { display: flex; flex-direction: column; overflow: hidden; }
@@ -181,9 +200,6 @@
 
     <div>
       <div class="sec-title">Configuración</div>
-      <div class="notice">
-        Las llamadas a la API se hacen desde el <strong>servidor Vercel</strong> — sin problemas de CORS. La API key se guarda solo en las variables de entorno del servidor, nunca en el browser.
-      </div>
 
       <label>Moneda</label>
       <select id="currency">
@@ -204,20 +220,20 @@
       <input type="number" id="daysRange" value="90" min="7" max="180">
     </div>
 
-    <!-- Hotels -->
+    <!-- Hotels (read-only) -->
     <div>
-      <div class="sec-title">Hoteles (hasta 4)</div>
+      <div class="sec-title">Hoteles comparados</div>
       <div id="hotelCards"></div>
-      <div class="notice" style="margin-top:8px;">
-        <strong>¿Cómo encontrar el Hotel ID?</strong><br>
-        Abrí el hotel en Booking.com → Ctrl+U (fuente) → buscá <code>hotel_id</code>
-      </div>
     </div>
+
+    <!-- Cache notice -->
+    <div id="cacheNotice" style="display:none;"></div>
 
     <!-- Actions -->
     <div style="display:flex;flex-direction:column;gap:8px;">
       <button class="btn btn-primary" id="fetchBtn" onclick="startFetch()">▶ Iniciar consulta</button>
       <button class="btn btn-stop" id="stopBtn" onclick="stopFetch()" style="display:none;">■ Detener</button>
+      <button class="btn btn-secondary" id="forceBtn" onclick="startFetch(true)" style="display:none;">↻ Forzar actualización</button>
       <button class="btn btn-secondary" onclick="loadDemo()">← Datos demo</button>
     </div>
 
@@ -250,7 +266,7 @@
       <div class="empty" id="emptyState">
         <div class="empty-icon">📊</div>
         <h3>Sin datos aún</h3>
-        <p>Completá los Hotel IDs y presioná <strong>Iniciar consulta</strong>. La API key ya está configurada en el servidor.</p>
+        <p>Presioná <strong>Iniciar consulta</strong>. Los 5 hoteles están preconfigurados y la API key está en el servidor.</p>
       </div>
     </div>
   </main>
@@ -258,40 +274,115 @@
 
 <script>
 // ─── CONFIG ──────────────────────────────────────────────────
-const COLORS   = ['#f0b429','#34d399','#60a5fa','#f87171'];
+const COLORS   = ['#f0b429','#34d399','#60a5fa','#f87171','#c084fc'];
 const CUR_SYM  = { USD:'$', EUR:'€', ARS:'$', BRL:'R$', MXN:'$' };
 const DAYS_ES  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const CACHE_PREFIX = 'priceShopper_';
 
-// Default hotels — Ushuaia
 const DEFAULT_HOTELS = [
-  { name: 'Lennox Hotel Ushuaia',      id: '186029' },
-  { name: 'Canal Beagle Ushuaia',      id: '' },
-  { name: 'Hotel Albatros Ushuaia',    id: '' },
-  { name: 'Cilene del Fuego Ushuaia',  id: '' },
+  { name: 'Lennox Hotel',           id: '186029',  mine: true  },
+  { name: 'Canal Beagle Ushuaia',   id: '8017079', mine: false },
+  { name: 'Hotel Albatros Ushuaia', id: '191446',  mine: false },
+  { name: 'Cilene del Fuego',       id: '186028',  mine: false },
+  { name: 'Los Cauquenes Resort',   id: '23805',   mine: false },
 ];
 
 // ─── STATE ───────────────────────────────────────────────────
-let state = { hotels: [], results: [], currency: 'USD', isDemo: false, chart: null, filter: 'all', abort: false };
+let state = { results: [], currency: 'USD', isDemo: false, chart: null, filter: 'all', abort: false };
 
 // ─── INIT ────────────────────────────────────────────────────
 (function init() {
   renderHotelCards();
+  tryAutoLoadCache();
 })();
 
 function renderHotelCards() {
   const wrap = document.getElementById('hotelCards');
   wrap.innerHTML = DEFAULT_HOTELS.map((h, i) => `
-    <div class="hotel-card">
-      <div class="card-header">
-        <div class="color-dot" style="background:${COLORS[i]}"></div>
-        <div class="card-label">Hotel ${['A','B','C','D'][i]}</div>
+    <div class="hotel-static ${h.mine ? 'mine' : ''}">
+      <div class="color-dot" style="background:${COLORS[i]}"></div>
+      <div class="hotel-static-info">
+        <div class="hotel-static-name">${h.name}</div>
+        <div class="hotel-static-id">ID: ${h.id}</div>
       </div>
-      <label>Nombre</label>
-      <input type="text" class="h-name" data-i="${i}" value="${h.name}" placeholder="Nombre del hotel">
-      <label>Hotel ID</label>
-      <input type="text" class="h-id" data-i="${i}" value="${h.id}" placeholder="ej: 186029" style="font-family:var(--mono)">
+      <div class="hotel-badge ${h.mine ? 'badge-mine' : 'badge-comp'}">${h.mine ? 'Mi hotel' : 'Comp.'}</div>
     </div>
   `).join('');
+}
+
+// ─── CACHE ───────────────────────────────────────────────────
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function getCacheKey() {
+  return CACHE_PREFIX + todayStr();
+}
+
+function loadFromCache(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data.date !== todayStr()) return null;
+    return data;
+  } catch { return null; }
+}
+
+function saveToCache(results, currency, adults, days) {
+  try {
+    const key = getCacheKey();
+    const payload = {
+      date: todayStr(),
+      fetchedAt: new Date().toISOString(),
+      currency, adults, days, results
+    };
+    localStorage.setItem(key, JSON.stringify(payload));
+    // Limpiar caché de días anteriores
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith(CACHE_PREFIX) && k !== key) localStorage.removeItem(k);
+    }
+  } catch(e) { console.warn('Cache write failed:', e); }
+}
+
+function clearTodayCache() {
+  localStorage.removeItem(getCacheKey());
+}
+
+function tryAutoLoadCache() {
+  const cached = loadFromCache(getCacheKey());
+  if (cached) applyCache(cached);
+}
+
+function applyCache(cached) {
+  state.results  = cached.results;
+  state.currency = cached.currency;
+  state.isDemo   = false;
+  document.getElementById('currency').value  = cached.currency;
+  document.getElementById('adults').value    = cached.adults;
+  document.getElementById('daysRange').value = cached.days;
+  const time = cached.fetchedAt
+    ? new Date(cached.fetchedAt).toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' })
+    : '';
+  setStatus('ok', `Caché · ${cached.date}`);
+  showCacheNotice(cached.date, time);
+  renderDashboard();
+}
+
+function showCacheNotice(date, time) {
+  const el = document.getElementById('cacheNotice');
+  el.style.display = 'block';
+  el.innerHTML = `<div class="cache-notice">
+    <strong>Datos en caché</strong><br>
+    Última consulta: ${date}${time ? ' a las ' + time : ''}.<br>
+    Se actualizarán automáticamente mañana.
+  </div>`;
+  document.getElementById('forceBtn').style.display = 'block';
+}
+
+function hideCacheNotice() {
+  document.getElementById('cacheNotice').style.display = 'none';
+  document.getElementById('forceBtn').style.display    = 'none';
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────
@@ -337,39 +428,43 @@ function extractPrice(data) {
 
 // ─── DEMO ────────────────────────────────────────────────────
 function loadDemo() {
-  const names = ['Lennox Hotel','Canal Beagle','Hotel Albatros','Cilene del Fuego'];
-  const bases  = [180, 140, 120, 200];
-  const dates  = getDates(90);
-  state.results = names.map((name,i)=>({
-    name, id:'demo',
-    prices: dates.map((date,j)=>{
-      const s=(Math.sin(j/90*Math.PI)*0.25), n=(Math.random()-.5)*.18, w=isWeekend(date)?.12:0;
-      return { date, price: Math.max(Math.round(bases[i]*(1+s+n+w)),60) };
+  const bases = [180, 140, 120, 160, 200];
+  const dates = getDates(90);
+  state.results = DEFAULT_HOTELS.map((h, i) => ({
+    name: h.name, id: 'demo', mine: h.mine,
+    prices: dates.map((date, j) => {
+      const s = (Math.sin(j/90*Math.PI)*0.25), n = (Math.random()-.5)*.18, w = isWeekend(date) ? .12 : 0;
+      return { date, price: Math.max(Math.round(bases[i]*(1+s+n+w)), 60) };
     })
   }));
   state.currency = document.getElementById('currency').value;
   state.isDemo   = true;
+  hideCacheNotice();
   setStatus('ok','Datos demo cargados');
   renderDashboard();
 }
 
 // ─── FETCH ───────────────────────────────────────────────────
-async function startFetch() {
-  const names  = [...document.querySelectorAll('.h-name')].map(e=>e.value.trim());
-  const ids    = [...document.querySelectorAll('.h-id')].map(e=>e.value.trim());
-  const days   = parseInt(document.getElementById('daysRange').value)||90;
+async function startFetch(force = false) {
+  const days   = parseInt(document.getElementById('daysRange').value) || 90;
   const adults = document.getElementById('adults').value;
   state.currency = document.getElementById('currency').value;
 
-  const hotels = ids.map((id,i)=>({id,name:names[i]||'Hotel '+(i+1)})).filter(h=>h.id);
-  if (!hotels.length) { alert('Ingresá al menos 1 Hotel ID'); return; }
+  // Verificar caché a menos que se fuerce actualización
+  if (!force) {
+    const cached = loadFromCache(getCacheKey());
+    if (cached) { applyCache(cached); return; }
+  }
+
+  clearTodayCache();
+  hideCacheNotice();
 
   state.abort   = false;
   state.results = [];
   state.isDemo  = false;
 
-  document.getElementById('fetchBtn').style.display = 'none';
-  document.getElementById('stopBtn').style.display  = 'block';
+  document.getElementById('fetchBtn').style.display    = 'none';
+  document.getElementById('stopBtn').style.display     = 'block';
   document.getElementById('progressWrap').style.display = 'block';
   document.getElementById('logArea').innerHTML = '';
   document.getElementById('emptyState')?.remove();
@@ -379,10 +474,10 @@ async function startFetch() {
   setProgress(0, 'Iniciando...');
 
   const dates = getDates(days);
-  const total = hotels.length * dates.length;
+  const total = DEFAULT_HOTELS.length * dates.length;
   let done    = 0;
 
-  for (const hotel of hotels) {
+  for (const hotel of DEFAULT_HOTELS) {
     if (state.abort) break;
     const prices = [];
     addLog(`Iniciando: ${hotel.name}`, 'info');
@@ -395,7 +490,6 @@ async function startFetch() {
       const checkOut = d2.toISOString().split('T')[0];
 
       try {
-        // ↓ Calls our Vercel proxy — no CORS, API key stays server-side
         const url = `/api/rooms?hotel_id=${hotel.id}&arrival_date=${checkIn}&departure_date=${checkOut}&rec_guest_qty=${adults}&currency_code=${state.currency}`;
         const resp  = await fetch(url);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -410,16 +504,27 @@ async function startFetch() {
 
       done++;
       setProgress(Math.round(done/total*100));
-      await sleep(150); // respeta rate limit: ~6 req/s < límite de 5/s con margen
+      await sleep(150);
     }
 
-    state.results.push({ name: hotel.name, id: hotel.id, prices });
-    renderDashboard(); // actualiza gráfico después de cada hotel
+    state.results.push({ name: hotel.name, id: hotel.id, mine: hotel.mine, prices });
+    renderDashboard();
   }
 
   document.getElementById('fetchBtn').style.display = 'block';
   document.getElementById('stopBtn').style.display  = 'none';
-  setStatus(state.abort?'':'ok', state.abort?'Detenido':'Listo · '+state.results.length+' hoteles · '+days+' días');
+
+  if (!state.abort) {
+    saveToCache(state.results, state.currency, adults, days);
+    const cached = loadFromCache(getCacheKey());
+    if (cached) {
+      const time = new Date(cached.fetchedAt).toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' });
+      showCacheNotice(cached.date, time);
+    }
+    setStatus('ok', `Listo · ${state.results.length} hoteles · ${days} días`);
+  } else {
+    setStatus('','Detenido por el usuario');
+  }
 }
 
 function stopFetch() {
@@ -474,7 +579,10 @@ function renderDashboard() {
 
 function buildLegend() {
   document.getElementById('legend').innerHTML = state.results.map((h,i)=>
-    `<div class="legend-item"><div class="legend-dot" style="background:${COLORS[i]}"></div>${h.name.split(' ').slice(0,2).join(' ')}</div>`
+    `<div class="legend-item">
+      <div class="legend-dot" style="background:${COLORS[i]}"></div>
+      ${h.name.split(' ').slice(0,2).join(' ')}${h.mine?' ★':''}
+    </div>`
   ).join('');
 }
 
@@ -491,7 +599,8 @@ function buildChart() {
       datasets: state.results.map((h,i)=>({
         label:h.name, data:h.prices.map(p=>p.price),
         borderColor:COLORS[i], backgroundColor:COLORS[i]+'18',
-        borderWidth:1.5, pointRadius:0, pointHoverRadius:4, tension:.3, fill:false
+        borderWidth: h.mine ? 2.5 : 1.5,
+        pointRadius:0, pointHoverRadius:4, tension:.3, fill:false
       }))
     },
     options: {
@@ -526,7 +635,7 @@ function buildTable() {
   const dates = r[0].prices.map(p=>p.date);
 
   thead.innerHTML = `<th>Fecha</th><th>Día</th>`+
-    r.map((h,i)=>`<th class="r" style="color:${COLORS[i]}">${h.name.split(' ').slice(0,3).join(' ')}</th>`).join('')+
+    r.map((h,i)=>`<th class="r" style="color:${COLORS[i]}">${h.name.split(' ').slice(0,3).join(' ')}${h.mine?' ★':''}</th>`).join('')+
     (r.length>1?`<th class="r">Spread</th>`:'');
 
   const filtered = dates.filter(d=>{
