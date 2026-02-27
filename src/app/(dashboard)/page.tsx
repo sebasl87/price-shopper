@@ -35,7 +35,7 @@ export default function DashboardPage() {
 
   const [currency, setCurrency] = useState('USD');
   const [adults, setAdults] = useState('2');
-  const [days, setDays] = useState(90);
+  const [days, setDays] = useState(60);
 
   const params: FetchParams = { currency, adults, days };
   const { data, isLoading } = usePrices(params);
@@ -212,8 +212,8 @@ export default function DashboardPage() {
             type="number"
             value={days}
             min={7}
-            max={180}
-            onChange={(e) => setDays(parseInt(e.target.value) || 90)}
+            max={60}
+            onChange={(e) => setDays(parseInt(e.target.value) || 60)}
             disabled={isFetching}
           />
         </div>

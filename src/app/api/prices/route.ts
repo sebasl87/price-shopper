@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const currency = searchParams.get('currency') ?? 'USD';
   const adults = searchParams.get('adults') ?? '2';
-  const days = parseInt(searchParams.get('days') ?? '90');
+  const days = parseInt(searchParams.get('days') ?? '60');
   const date = searchParams.get('date') ?? todayStr();
 
   const { data, error } = await supabaseAdmin
