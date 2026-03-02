@@ -13,6 +13,9 @@ if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
       console.log("PostHog loaded. API Host:", (ph as any).config.api_host);
     },
   });
+
+  // Force update config to ensure api_host is correct even if cached
+  posthog.set_config({ api_host: "/ingest" });
 }
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
