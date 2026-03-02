@@ -208,14 +208,12 @@ export default function DashboardPage() {
           </select>
 
           <label>Días a consultar</label>
-          <input
-            type="number"
-            value={days}
-            min={7}
-            max={60}
-            onChange={(e) => setDays(parseInt(e.target.value) || 60)}
-            disabled={isFetching}
-          />
+          <select value={days} onChange={(e) => setDays(parseInt(e.target.value))} disabled={isFetching}>
+            <option value={15}>15 días</option>
+            <option value={30}>30 días</option>
+            <option value={45}>45 días</option>
+            <option value={60}>60 días</option>
+          </select>
         </div>
 
         {/* Hotels */}
