@@ -67,6 +67,9 @@ export default function DashboardPage() {
   // Feature Flag: enable-start-consultation
   const isStartEnabled = useFeatureFlagEnabled("enable-start-consultation");
 
+  // Debug: Log the flag status
+  // console.log("Feature Flag 'enable-start-consultation':", isStartEnabled);
+
   const addLog = useCallback((msg: string, type = "info") => {
     setLogs((prev) => [...prev, { msg, type }]);
   }, []);
