@@ -305,7 +305,7 @@ export default function DashboardPage() {
             </button>
           ) : (
             <>
-              {!hasCachedData && isStartEnabled !== false && (
+              {!hasCachedData && isStartEnabled === true && (
                 <button
                   className="btn btn-primary"
                   onClick={() => startFetch(false)}
@@ -313,7 +313,7 @@ export default function DashboardPage() {
                   ▶ Iniciar consulta
                 </button>
               )}
-              {hasCachedData && isStartEnabled !== false && (
+              {hasCachedData && isStartEnabled === true && (
                 <button
                   className="btn btn-secondary"
                   onClick={() => startFetch(true)}
