@@ -14,7 +14,6 @@ import { extractPrice } from "@/lib/extractPrice";
 import type {
   FetchParams,
   HotelResult,
-  PricePoint,
   PricesResponse,
 } from "@/types/prices";
 
@@ -83,25 +82,35 @@ export default function DashboardPage() {
     setLiveResults([]);
 
     const dateList = getDates(days);
-    const total = HOTELS.length * dateList.length;
+    const total = dateList.length;
     let done = 0;
-    const results: HotelResult[] = [];
     const sym = CUR_SYM[currency] ?? "$";
 
-    for (const hotel of HOTELS) {
+    // Pre-build results array so all hotels are present from the start
+    const results: HotelResult[] = HOTELS.map((hotel) => ({
+      name: hotel.name,
+      id: hotel.id,
+      mine: hotel.mine,
+      prices: [],
+    }));
+
+    for (let i = 0; i < dateList.length; i++) {
       if (abortRef.current) break;
-      const prices: PricePoint[] = [];
-      addLog(`Iniciando: ${hotel.name}`, "info");
-      setProgress({ done, total, label: `Hotel: ${hotel.name}` });
 
-      for (let i = 0; i < dateList.length; i++) {
-        if (abortRef.current) break;
-        const checkIn = dateList[i];
-        const d2 = new Date(checkIn + "T00:00:00");
-        d2.setDate(d2.getDate() + 1);
-        const checkOut = d2.toISOString().split("T")[0];
+      const checkIn = dateList[i];
+      const d2 = new Date(checkIn + "T00:00:00");
+      d2.setDate(d2.getDate() + 1);
+      const checkOut = d2.toISOString().split("T")[0];
+      const fmtDate = new Date(checkIn + "T00:00:00").toLocaleDateString(
+        "es-AR",
+        { day: "2-digit", month: "short" },
+      );
 
-        try {
+      setProgress({ done, total, label: `Fecha: ${fmtDate}` });
+
+      // Fetch all hotels for this date in parallel
+      await Promise.allSettled(
+        HOTELS.map(async (hotel, hotelIdx) => {
           const qs = new URLSearchParams({
             hotel_id: hotel.id,
             arrival_date: checkIn,
@@ -109,48 +118,33 @@ export default function DashboardPage() {
             rec_guest_qty: adults,
             currency_code: currency,
           });
-          const resp = await fetch(`/api/rooms?${qs}`);
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const apiData = await resp.json();
-          const price = extractPrice(apiData);
-          prices.push({ date: checkIn, price });
+          try {
+            const resp = await fetch(`/api/rooms?${qs}`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const apiData = await resp.json();
+            const price = extractPrice(apiData);
+            results[hotelIdx].prices.push({ date: checkIn, price });
+            const priceStr =
+              price != null ? `${sym}${price.toLocaleString()}` : "—";
+            addLog(
+              `✓ ${hotel.name.split(" ")[0]} ${fmtDate} → ${priceStr}`,
+              price != null ? "ok" : "warn",
+            );
+          } catch (e) {
+            results[hotelIdx].prices.push({ date: checkIn, price: null });
+            addLog(
+              `✗ ${hotel.name.split(" ")[0]} ${fmtDate} → ${(e as Error).message}`,
+              "err",
+            );
+          }
+        }),
+      );
 
-          const fmtDate = new Date(checkIn + "T00:00:00").toLocaleDateString(
-            "es-AR",
-            {
-              day: "2-digit",
-              month: "short",
-            },
-          );
-          const priceStr =
-            price != null ? `${sym}${price.toLocaleString()}` : "—";
-          done++;
-          setProgress((p) => ({ ...p, done }));
-          addLog(`✓ ${fmtDate} → ${priceStr}`, price != null ? "ok" : "warn");
-        } catch (e) {
-          prices.push({ date: checkIn, price: null });
-          const fmtDate = new Date(checkIn + "T00:00:00").toLocaleDateString(
-            "es-AR",
-            {
-              day: "2-digit",
-              month: "short",
-            },
-          );
-          done++;
-          setProgress((p) => ({ ...p, done }));
-          addLog(`✗ ${fmtDate} → ${(e as Error).message}`, "err");
-        }
+      done++;
+      setProgress((p) => ({ ...p, done }));
+      setLiveResults(results.map((r) => ({ ...r, prices: [...r.prices] })));
 
-        await sleep(150);
-      }
-
-      results.push({
-        name: hotel.name,
-        id: hotel.id,
-        mine: hotel.mine,
-        prices,
-      });
-      setLiveResults([...results]);
+      await sleep(150);
     }
 
     if (!abortRef.current && results.length > 0) {
