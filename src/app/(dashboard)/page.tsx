@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useFeatureFlagEnabled } from "posthog-js/react";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import HotelList from "@/components/dashboard/HotelList";
 import StatsBar from "@/components/dashboard/StatsBar";
 import PriceChart from "@/components/dashboard/PriceChart";
@@ -65,7 +65,7 @@ export default function DashboardPage() {
   const abortRef = useRef(false);
 
   // Feature Flag: enable-start-consultation
-  const isStartEnabled = useFeatureFlagEnabled("enable-start-consultation");
+  const isStartEnabled = useFeatureFlag("enable-start-consultation");
 
   const addLog = useCallback((msg: string, type = "info") => {
     setLogs((prev) => [...prev, { msg, type }]);

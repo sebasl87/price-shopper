@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Space_Mono, DM_Sans } from "next/font/google";
 import "./globals.css";
 import QueryProvider from "@/components/QueryProvider";
-import { PostHogProvider } from "@/components/PostHogProvider";
+import { ConfigCatProvider } from "@/components/ConfigCatProvider";
 
 const spaceMono = Space_Mono({
   weight: ["400", "700"],
@@ -29,9 +29,9 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={`${spaceMono.variable} ${dmSans.variable}`}>
-        <PostHogProvider>
+        <ConfigCatProvider>
           <QueryProvider>{children}</QueryProvider>
-        </PostHogProvider>
+        </ConfigCatProvider>
       </body>
     </html>
   );
