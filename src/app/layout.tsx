@@ -17,7 +17,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Price Shopper · Booking.com",
+  title: "Price Shopper · Custom-xs",
   description: "Hotel price comparison dashboard",
 };
 

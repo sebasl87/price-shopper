@@ -11,7 +11,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     <>
       <header>
         <div className="logo">
-          Price Shopper <span>· Booking.com</span>
+          Price Shopper <span>· Custom-xs</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div className="status">
