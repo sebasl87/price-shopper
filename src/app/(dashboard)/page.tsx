@@ -1,18 +1,27 @@
-'use client';
+"use client";
 
-import { useState, useRef, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import HotelList from '@/components/dashboard/HotelList';
-import StatsBar from '@/components/dashboard/StatsBar';
-import PriceChart from '@/components/dashboard/PriceChart';
-import PriceTable from '@/components/dashboard/PriceTable';
-import ProgressLog from '@/components/dashboard/ProgressLog';
-import { usePrices } from '@/hooks/usePrices';
-import { HOTELS } from '@/lib/hotels';
-import { extractPrice } from '@/lib/extractPrice';
-import type { FetchParams, HotelResult, PricePoint, PricesResponse } from '@/types/prices';
+import { useState, useRef, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
+import HotelList from "@/components/dashboard/HotelList";
+import StatsBar from "@/components/dashboard/StatsBar";
+import PriceChart from "@/components/dashboard/PriceChart";
+import PriceTable from "@/components/dashboard/PriceTable";
+import ProgressLog from "@/components/dashboard/ProgressLog";
+import { usePrices } from "@/hooks/usePrices";
+import { HOTELS } from "@/lib/hotels";
+import { extractPrice } from "@/lib/extractPrice";
+import type {
+  FetchParams,
+  HotelResult,
+  PricePoint,
+  PricesResponse,
+} from "@/types/prices";
 
-interface LogEntry { msg: string; type: string; }
+interface LogEntry {
+  msg: string;
+  type: string;
+}
 
 function getDates(n: number): string[] {
   const dates: string[] = [];
@@ -21,33 +30,44 @@ function getDates(n: number): string[] {
   for (let i = 1; i <= n; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
-    dates.push(d.toISOString().split('T')[0]);
+    dates.push(d.toISOString().split("T")[0]);
   }
   return dates;
 }
 
-function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
-const CUR_SYM: Record<string, string> = { USD: '$', EUR: '€', ARS: '$', BRL: 'R$', MXN: '$' };
+const CUR_SYM: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  ARS: "$",
+  BRL: "R$",
+  MXN: "$",
+};
 
 export default function DashboardPage() {
   const qc = useQueryClient();
 
-  const [currency, setCurrency] = useState('USD');
-  const [adults, setAdults] = useState('2');
+  const [currency, setCurrency] = useState("USD");
+  const [adults, setAdults] = useState("2");
   const [days, setDays] = useState(60);
 
   const params: FetchParams = { currency, adults, days };
   const { data, isLoading } = usePrices(params);
 
   const [isFetching, setIsFetching] = useState(false);
-  const [progress, setProgress] = useState({ done: 0, total: 0, label: '' });
+  const [progress, setProgress] = useState({ done: 0, total: 0, label: "" });
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [liveResults, setLiveResults] = useState<HotelResult[]>([]);
   const [isDemo, setIsDemo] = useState(false);
   const abortRef = useRef(false);
 
-  const addLog = useCallback((msg: string, type = 'info') => {
+  // Feature Flag: enable-start-consultation
+  const isStartEnabled = useFeatureFlag("enable-start-consultation");
+
+  const addLog = useCallback((msg: string, type = "info") => {
     setLogs((prev) => [...prev, { msg, type }]);
   }, []);
 
@@ -64,20 +84,20 @@ export default function DashboardPage() {
     const total = HOTELS.length * dateList.length;
     let done = 0;
     const results: HotelResult[] = [];
-    const sym = CUR_SYM[currency] ?? '$';
+    const sym = CUR_SYM[currency] ?? "$";
 
     for (const hotel of HOTELS) {
       if (abortRef.current) break;
       const prices: PricePoint[] = [];
-      addLog(`Iniciando: ${hotel.name}`, 'info');
+      addLog(`Iniciando: ${hotel.name}`, "info");
       setProgress({ done, total, label: `Hotel: ${hotel.name}` });
 
       for (let i = 0; i < dateList.length; i++) {
         if (abortRef.current) break;
         const checkIn = dateList[i];
-        const d2 = new Date(checkIn + 'T00:00:00');
+        const d2 = new Date(checkIn + "T00:00:00");
         d2.setDate(d2.getDate() + 1);
-        const checkOut = d2.toISOString().split('T')[0];
+        const checkOut = d2.toISOString().split("T")[0];
 
         try {
           const qs = new URLSearchParams({
@@ -93,44 +113,58 @@ export default function DashboardPage() {
           const price = extractPrice(apiData);
           prices.push({ date: checkIn, price });
 
-          const fmtDate = new Date(checkIn + 'T00:00:00').toLocaleDateString('es-AR', {
-            day: '2-digit', month: 'short',
-          });
-          const priceStr = price != null ? `${sym}${price.toLocaleString()}` : '—';
+          const fmtDate = new Date(checkIn + "T00:00:00").toLocaleDateString(
+            "es-AR",
+            {
+              day: "2-digit",
+              month: "short",
+            },
+          );
+          const priceStr =
+            price != null ? `${sym}${price.toLocaleString()}` : "—";
           done++;
           setProgress((p) => ({ ...p, done }));
-          addLog(`✓ ${fmtDate} → ${priceStr}`, price != null ? 'ok' : 'warn');
+          addLog(`✓ ${fmtDate} → ${priceStr}`, price != null ? "ok" : "warn");
         } catch (e) {
           prices.push({ date: checkIn, price: null });
-          const fmtDate = new Date(checkIn + 'T00:00:00').toLocaleDateString('es-AR', {
-            day: '2-digit', month: 'short',
-          });
+          const fmtDate = new Date(checkIn + "T00:00:00").toLocaleDateString(
+            "es-AR",
+            {
+              day: "2-digit",
+              month: "short",
+            },
+          );
           done++;
           setProgress((p) => ({ ...p, done }));
-          addLog(`✗ ${fmtDate} → ${(e as Error).message}`, 'err');
+          addLog(`✗ ${fmtDate} → ${(e as Error).message}`, "err");
         }
 
         await sleep(150);
       }
 
-      results.push({ name: hotel.name, id: hotel.id, mine: hotel.mine, prices });
+      results.push({
+        name: hotel.name,
+        id: hotel.id,
+        mine: hotel.mine,
+        prices,
+      });
       setLiveResults([...results]);
     }
 
     if (!abortRef.current && results.length > 0) {
       try {
-        const res = await fetch('/api/prices', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const res = await fetch("/api/prices", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ results, currency, adults, days }),
         });
         if (res.ok) {
           const snapshot = await res.json();
           const response: PricesResponse = { snapshot, fromCache: false };
-          qc.setQueryData(['prices', params], response);
+          qc.setQueryData(["prices", params], response);
         }
       } catch (e) {
-        console.error('Failed to save snapshot:', e);
+        console.error("Failed to save snapshot:", e);
       }
     }
 
@@ -147,29 +181,42 @@ export default function DashboardPage() {
     const dateList = getDates(days);
     const demoResults: HotelResult[] = HOTELS.map((h, i) => ({
       name: h.name,
-      id: 'demo',
+      id: "demo",
       mine: h.mine,
       prices: dateList.map((date, j) => {
         const s = Math.sin((j / 90) * Math.PI) * 0.25;
         const n = (Math.random() - 0.5) * 0.18;
-        const d = new Date(date + 'T00:00:00');
+        const d = new Date(date + "T00:00:00");
         const wk = d.getDay() === 0 || d.getDay() === 6 ? 0.12 : 0;
-        return { date, price: Math.max(Math.round(bases[i] * (1 + s + n + wk)), 60) };
+        return {
+          date,
+          price: Math.max(Math.round(bases[i] * (1 + s + n + wk)), 60),
+        };
       }),
     }));
     setLiveResults(demoResults);
     setIsDemo(true);
   }
 
-  const displayResults = liveResults.length ? liveResults : (data?.snapshot?.results ?? []);
-  const displayCurrency = liveResults.length ? currency : (data?.snapshot?.currency ?? currency);
+  const displayResults = liveResults.length
+    ? liveResults
+    : (data?.snapshot?.results ?? []);
+  const displayCurrency = liveResults.length
+    ? currency
+    : (data?.snapshot?.currency ?? currency);
   const hasCachedData = !!data?.snapshot && !liveResults.length && !isDemo;
 
   if (isLoading) {
     return (
       <div className="app">
         <aside className="sidebar">
-          <div style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '11px' }}>
+          <div
+            style={{
+              color: "var(--muted)",
+              fontFamily: "var(--mono)",
+              fontSize: "11px",
+            }}
+          >
             Cargando...
           </div>
         </aside>
@@ -193,7 +240,11 @@ export default function DashboardPage() {
         <div>
           <div className="sec-title">Configuración</div>
           <label>Moneda</label>
-          <select value={currency} onChange={(e) => setCurrency(e.target.value)} disabled={isFetching}>
+          <select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            disabled={isFetching}
+          >
             <option value="USD">USD — Dólar</option>
             <option value="EUR">EUR — Euro</option>
             <option value="ARS">ARS — Peso ARG</option>
@@ -202,13 +253,21 @@ export default function DashboardPage() {
           </select>
 
           <label>Adultos / habitación</label>
-          <select value={adults} onChange={(e) => setAdults(e.target.value)} disabled={isFetching}>
+          <select
+            value={adults}
+            onChange={(e) => setAdults(e.target.value)}
+            disabled={isFetching}
+          >
             <option value="2">2 adultos (doble)</option>
             <option value="1">1 adulto (single)</option>
           </select>
 
           <label>Días a consultar</label>
-          <select value={days} onChange={(e) => setDays(parseInt(e.target.value))} disabled={isFetching}>
+          <select
+            value={days}
+            onChange={(e) => setDays(parseInt(e.target.value))}
+            disabled={isFetching}
+          >
             <option value={15}>15 días</option>
             <option value={30}>30 días</option>
             <option value={45}>45 días</option>
@@ -225,27 +284,37 @@ export default function DashboardPage() {
         {/* Cache notice */}
         {hasCachedData && (
           <div className="cache-notice">
-            <strong>Datos en caché</strong><br />
-            Última consulta: {data!.snapshot!.date}<br />
-            Consultado por: {data!.snapshot!.fetched_by}<br />
+            <strong>Datos en caché</strong>
+            <br />
+            Última consulta: {data!.snapshot!.date}
+            <br />
+            Consultado por: {data!.snapshot!.fetched_by}
+            <br />
             Se actualizarán automáticamente mañana.
           </div>
         )}
 
         {/* Actions */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {isFetching ? (
             <button className="btn btn-stop" onClick={stopFetch}>
               ■ Detener
             </button>
           ) : (
             <>
-              {!hasCachedData ? (
-                <button className="btn btn-primary" onClick={() => startFetch(false)}>
+              {!hasCachedData && isStartEnabled !== false && (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => startFetch(false)}
+                >
                   ▶ Iniciar consulta
                 </button>
-              ) : (
-                <button className="btn btn-secondary" onClick={() => startFetch(true)}>
+              )}
+              {hasCachedData && isStartEnabled !== false && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => startFetch(true)}
+                >
                   ↻ Forzar actualización
                 </button>
               )}
@@ -270,7 +339,11 @@ export default function DashboardPage() {
       </aside>
 
       <main className="main">
-        <StatsBar results={displayResults} currency={displayCurrency} isDemo={isDemo} />
+        <StatsBar
+          results={displayResults}
+          currency={displayCurrency}
+          isDemo={isDemo}
+        />
 
         <div className="content">
           {displayResults.length === 0 ? (
@@ -278,8 +351,8 @@ export default function DashboardPage() {
               <div className="empty-icon">📊</div>
               <h3>Sin datos aún</h3>
               <p>
-                Presioná <strong>Iniciar consulta</strong>. Los 5 hoteles están preconfigurados y
-                la API key está en el servidor.
+                Presioná <strong>Iniciar consulta</strong>. Los 5 hoteles están
+                preconfigurados y la API key está en el servidor.
               </p>
             </div>
           ) : (
