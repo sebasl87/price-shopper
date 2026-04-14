@@ -26,7 +26,7 @@ export default function LoginPage() {
             Price Shopper
           </div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--muted)' }}>
-            · Booking.com ·
+            · Custom-xs ·
           </div>
         </div>
         <LoginForm />
