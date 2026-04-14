@@ -66,6 +66,8 @@ export default function DashboardPage() {
 
   // Feature Flag: enable-start-consultation
   const isStartEnabled = useFeatureFlag("enable-start-consultation");
+  // Feature Flag: enable-demo
+  const isDemoEnabled = useFeatureFlag("enable-demo");
 
   const addLog = useCallback((msg: string, type = "info") => {
     setLogs((prev) => [...prev, { msg, type }]);
@@ -177,6 +179,7 @@ export default function DashboardPage() {
   }
 
   function loadDemo() {
+    if (isDemoEnabled === false) return;
     const bases = [180, 140, 120, 160, 200];
     const dateList = getDates(days);
     const demoResults: HotelResult[] = HOTELS.map((h, i) => ({
@@ -318,9 +321,11 @@ export default function DashboardPage() {
                   ↻ Forzar actualización
                 </button>
               )}
-              <button className="btn btn-secondary" onClick={loadDemo}>
-                ← Datos demo
-              </button>
+              {isDemoEnabled !== false && (
+                <button className="btn btn-secondary" onClick={loadDemo}>
+                  ← Datos demo
+                </button>
+              )}
             </>
           )}
         </div>
