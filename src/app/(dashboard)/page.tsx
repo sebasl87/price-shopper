@@ -121,25 +121,38 @@ export default function DashboardPage() {
             rec_guest_qty: adults,
             currency_code: currency,
           });
-          try {
-            const resp = await fetch(`/api/rooms?${qs}`);
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            const apiData = await resp.json();
-            const price = extractPrice(apiData);
-            results[hotelIdx].prices.push({ date: checkIn, price });
-            const priceStr =
-              price != null ? `${sym}${price.toLocaleString()}` : "—";
-            addLog(
-              `✓ ${hotel.name.split(" ")[0]} ${fmtDate} → ${priceStr}`,
-              price != null ? "ok" : "warn",
-            );
-          } catch (e) {
-            results[hotelIdx].prices.push({ date: checkIn, price: null });
-            addLog(
-              `✗ ${hotel.name.split(" ")[0]} ${fmtDate} → ${(e as Error).message}`,
-              "err",
-            );
+
+          const MAX_RETRIES = 2;
+          let price: number | null = null;
+          let lastError = "";
+
+          for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            if (attempt > 0) {
+              addLog(
+                `↻ ${hotel.name.split(" ")[0]} ${fmtDate} reintento ${attempt}…`,
+                "info",
+              );
+              await sleep(800 * attempt); // 800ms, 1600ms
+            }
+            try {
+              const resp = await fetch(`/api/rooms?${qs}`);
+              if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+              const apiData = await resp.json();
+              price = extractPrice(apiData);
+              if (price !== null) break; // got a valid price, stop retrying
+              lastError = "sin tarifa";
+            } catch (e) {
+              lastError = (e as Error).message;
+              if (!lastError.includes("429") && attempt === 0) break; // non-rate-limit error, don't retry
+            }
           }
+
+          results[hotelIdx].prices.push({ date: checkIn, price });
+          const priceStr = price != null ? `${sym}${price.toLocaleString()}` : "—";
+          addLog(
+            `${price != null ? "✓" : "✗"} ${hotel.name.split(" ")[0]} ${fmtDate} → ${price != null ? priceStr : lastError}`,
+            price != null ? "ok" : "warn",
+          );
         }),
       );
 
@@ -232,24 +245,39 @@ export default function DashboardPage() {
             rec_guest_qty: adults,
             currency_code: currency,
           });
-          try {
-            const resp = await fetch(`/api/rooms?${qs}`);
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            const apiData = await resp.json();
-            const price = extractPrice(apiData);
-            const entry = results[hotelIdx].prices.find((p) => p.date === checkIn);
-            if (entry) entry.price = price;
-            const priceStr = price != null ? `${sym}${price.toLocaleString()}` : "—";
-            addLog(
-              `✓ ${hotel.name.split(" ")[0]} ${fmtDate} → ${priceStr}`,
-              price != null ? "ok" : "warn",
-            );
-          } catch (e) {
-            addLog(
-              `✗ ${hotel.name.split(" ")[0]} ${fmtDate} → ${(e as Error).message}`,
-              "err",
-            );
+
+          const MAX_RETRIES = 2;
+          let price: number | null = null;
+          let lastError = "";
+
+          for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            if (attempt > 0) {
+              addLog(
+                `↻ ${hotel.name.split(" ")[0]} ${fmtDate} reintento ${attempt}…`,
+                "info",
+              );
+              await sleep(800 * attempt);
+            }
+            try {
+              const resp = await fetch(`/api/rooms?${qs}`);
+              if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+              const apiData = await resp.json();
+              price = extractPrice(apiData);
+              if (price !== null) break;
+              lastError = "sin tarifa";
+            } catch (e) {
+              lastError = (e as Error).message;
+              if (!lastError.includes("429") && attempt === 0) break;
+            }
           }
+
+          const entry = results[hotelIdx].prices.find((p) => p.date === checkIn);
+          if (entry) entry.price = price;
+          const priceStr = price != null ? `${sym}${price.toLocaleString()}` : "—";
+          addLog(
+            `${price != null ? "✓" : "✗"} ${hotel.name.split(" ")[0]} ${fmtDate} → ${price != null ? priceStr : lastError}`,
+            price != null ? "ok" : "warn",
+          );
         }),
       );
 
