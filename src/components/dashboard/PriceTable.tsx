@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import * as XLSX from 'xlsx';
 import type { HotelResult } from '@/types/prices';
 import { COLORS, CUR_SYM } from '@/lib/hotels';
 
@@ -39,33 +40,20 @@ export default function PriceTable({ results, currency }: PriceTableProps) {
     return true;
   });
 
-  function exportXML() {
-    const rows: string[] = [];
+  function exportXLS() {
+    const header = ['Fecha', ...results.map((h) => `${h.name} (${currency})`), 'Spread'];
+    const rowData: (string | number)[][] = [];
     dates.forEach((d) => {
-      const priceMap = results.map((h) => h.prices.find((p) => p.date === d)?.price ?? null);
-      const valid = priceMap.filter((p) => p != null) as number[];
+      const prices = results.map((h) => h.prices.find((p) => p.date === d)?.price ?? null);
+      const valid = prices.filter((p) => p != null) as number[];
       if (valid.length === 0) return;
-      const sp = valid.length > 1 ? Math.max(...valid) - Math.min(...valid) : null;
-      const hotelNodes = results
-        .map((h, i) => {
-          const p = priceMap[i];
-          const safeName = h.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          return p != null
-            ? `    <hotel name="${safeName}" moneda="${currency}">${p}</hotel>`
-            : `    <hotel name="${safeName}" moneda="${currency}" nd="true"/>`;
-        })
-        .join('\n');
-      const spreadNode = sp != null ? `\n    <spread>${sp}</spread>` : '';
-      rows.push(`  <dia fecha="${d}">\n${hotelNodes}${spreadNode}\n  </dia>`);
+      const sp = valid.length > 1 ? Math.max(...valid) - Math.min(...valid) : '';
+      rowData.push([d, ...prices.map((p) => p ?? ''), sp]);
     });
-    const xml =
-      `<?xml version="1.0" encoding="UTF-8"?>\n<precios>\n` +
-      rows.join('\n') +
-      `\n</precios>\n`;
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([xml], { type: 'application/xml' }));
-    a.download = `price-shopper-${new Date().toISOString().slice(0, 10)}.xml`;
-    a.click();
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rowData]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Precios');
+    XLSX.writeFile(wb, `price-shopper-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   return (
@@ -82,8 +70,8 @@ export default function PriceTable({ results, currency }: PriceTableProps) {
               {mode === 'all' ? 'Todos' : mode === 'weekday' ? 'Lun–Vie' : 'Fin semana'}
             </button>
           ))}
-          <button className="export-btn" onClick={exportXML}>
-            ⬇ XML
+          <button className="export-btn" onClick={exportXLS}>
+            ⬇ XLS
           </button>
         </div>
       </div>
