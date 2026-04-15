@@ -108,9 +108,10 @@ export default function DashboardPage() {
 
       setProgress({ done, total, label: `Fecha: ${fmtDate}` });
 
-      // Fetch all hotels for this date in parallel
+      // Fetch all hotels for this date in parallel, staggered to avoid rate-limit bursts
       await Promise.allSettled(
         HOTELS.map(async (hotel, hotelIdx) => {
+          if (hotelIdx > 0) await sleep(hotelIdx * 80);
           const qs = new URLSearchParams({
             hotel_id: hotel.id,
             arrival_date: checkIn,
