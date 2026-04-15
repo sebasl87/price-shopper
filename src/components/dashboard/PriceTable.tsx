@@ -39,18 +39,32 @@ export default function PriceTable({ results, currency }: PriceTableProps) {
     return true;
   });
 
-  function exportCSV() {
-    let csv = `Fecha,${results.map((h) => `${h.name} (${currency})`).join(',')},Spread\n`;
+  function exportXML() {
+    const rows: string[] = [];
     dates.forEach((d) => {
-      const prices = results.map((h) => h.prices.find((p) => p.date === d)?.price ?? '');
-      const valid = prices.filter((p) => p !== '') as number[];
-      if (valid.length === 0) return; // skip rows where no hotel has a price
-      const sp = valid.length > 1 ? Math.max(...valid) - Math.min(...valid) : '';
-      csv += `${d},${prices.join(',')},${sp}\n`;
+      const priceMap = results.map((h) => h.prices.find((p) => p.date === d)?.price ?? null);
+      const valid = priceMap.filter((p) => p != null) as number[];
+      if (valid.length === 0) return;
+      const sp = valid.length > 1 ? Math.max(...valid) - Math.min(...valid) : null;
+      const hotelNodes = results
+        .map((h, i) => {
+          const p = priceMap[i];
+          const safeName = h.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          return p != null
+            ? `    <hotel name="${safeName}" moneda="${currency}">${p}</hotel>`
+            : `    <hotel name="${safeName}" moneda="${currency}" nd="true"/>`;
+        })
+        .join('\n');
+      const spreadNode = sp != null ? `\n    <spread>${sp}</spread>` : '';
+      rows.push(`  <dia fecha="${d}">\n${hotelNodes}${spreadNode}\n  </dia>`);
     });
+    const xml =
+      `<?xml version="1.0" encoding="UTF-8"?>\n<precios>\n` +
+      rows.join('\n') +
+      `\n</precios>\n`;
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = `price-shopper-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.href = URL.createObjectURL(new Blob([xml], { type: 'application/xml' }));
+    a.download = `price-shopper-${new Date().toISOString().slice(0, 10)}.xml`;
     a.click();
   }
 
@@ -68,8 +82,8 @@ export default function PriceTable({ results, currency }: PriceTableProps) {
               {mode === 'all' ? 'Todos' : mode === 'weekday' ? 'Lun–Vie' : 'Fin semana'}
             </button>
           ))}
-          <button className="export-btn" onClick={exportCSV}>
-            ⬇ CSV
+          <button className="export-btn" onClick={exportXML}>
+            ⬇ XML
           </button>
         </div>
       </div>
