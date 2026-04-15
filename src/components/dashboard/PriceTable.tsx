@@ -44,6 +44,7 @@ export default function PriceTable({ results, currency }: PriceTableProps) {
     dates.forEach((d) => {
       const prices = results.map((h) => h.prices.find((p) => p.date === d)?.price ?? '');
       const valid = prices.filter((p) => p !== '') as number[];
+      if (valid.length === 0) return; // skip rows where no hotel has a price
       const sp = valid.length > 1 ? Math.max(...valid) - Math.min(...valid) : '';
       csv += `${d},${prices.join(',')},${sp}\n`;
     });
