@@ -67,6 +67,8 @@ export default function DashboardPage() {
   const isStartEnabled = useFeatureFlag("enable-start-consultation");
   // Feature Flag: enable-demo
   const isDemoEnabled = useFeatureFlag("enable-demo");
+  // Feature Flag: enable-patch-missing
+  const isPatchEnabled = useFeatureFlag("enable-patch-missing");
 
   const addLog = useCallback((msg: string, type = "info") => {
     setLogs((prev) => [...prev, { msg, type }]);
@@ -170,6 +172,109 @@ export default function DashboardPage() {
 
   function stopFetch() {
     abortRef.current = true;
+    setIsFetching(false);
+  }
+
+  async function patchMissing() {
+    if (!data?.snapshot) return;
+
+    abortRef.current = false;
+    setIsFetching(true);
+    setLogs([]);
+
+    // Deep-clone snapshot results so we don't mutate cached data
+    const results: HotelResult[] = data.snapshot.results.map((h) => ({
+      ...h,
+      prices: h.prices.map((p) => ({ ...p })),
+    }));
+
+    const sym = CUR_SYM[currency] ?? "$";
+
+    // Collect all null entries grouped by date for efficient batching
+    const nullsByDate = new Map<string, number[]>();
+    results.forEach((hotel, hotelIdx) => {
+      hotel.prices.forEach((p) => {
+        if (p.price === null) {
+          if (!nullsByDate.has(p.date)) nullsByDate.set(p.date, []);
+          nullsByDate.get(p.date)!.push(hotelIdx);
+        }
+      });
+    });
+
+    const dateList = [...nullsByDate.keys()].sort();
+    const total = dateList.length;
+    let done = 0;
+
+    setProgress({ done: 0, total, label: "" });
+
+    for (const checkIn of dateList) {
+      if (abortRef.current) break;
+
+      const d2 = new Date(checkIn + "T00:00:00");
+      d2.setDate(d2.getDate() + 1);
+      const checkOut = d2.toISOString().split("T")[0];
+      const fmtDate = new Date(checkIn + "T00:00:00").toLocaleDateString(
+        "es-AR",
+        { day: "2-digit", month: "short" },
+      );
+      const hotelIdxs = nullsByDate.get(checkIn)!;
+
+      setProgress({ done, total, label: `Parcheando: ${fmtDate}` });
+
+      await Promise.allSettled(
+        hotelIdxs.map(async (hotelIdx, i) => {
+          if (i > 0) await sleep(i * 80);
+          const hotel = HOTELS[hotelIdx];
+          const qs = new URLSearchParams({
+            hotel_id: hotel.id,
+            arrival_date: checkIn,
+            departure_date: checkOut,
+            rec_guest_qty: adults,
+            currency_code: currency,
+          });
+          try {
+            const resp = await fetch(`/api/rooms?${qs}`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const apiData = await resp.json();
+            const price = extractPrice(apiData);
+            const entry = results[hotelIdx].prices.find((p) => p.date === checkIn);
+            if (entry) entry.price = price;
+            const priceStr = price != null ? `${sym}${price.toLocaleString()}` : "—";
+            addLog(
+              `✓ ${hotel.name.split(" ")[0]} ${fmtDate} → ${priceStr}`,
+              price != null ? "ok" : "warn",
+            );
+          } catch (e) {
+            addLog(
+              `✗ ${hotel.name.split(" ")[0]} ${fmtDate} → ${(e as Error).message}`,
+              "err",
+            );
+          }
+        }),
+      );
+
+      done++;
+      setProgress((p) => ({ ...p, done }));
+      await sleep(150);
+    }
+
+    if (!abortRef.current) {
+      try {
+        const res = await fetch("/api/prices", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ results, currency, adults, days }),
+        });
+        if (res.ok) {
+          const snapshot = await res.json();
+          qc.setQueryData(["prices", params], { snapshot, fromCache: false });
+          setLiveResults(results);
+        }
+      } catch (e) {
+        console.error("Failed to save patched snapshot:", e);
+      }
+    }
+
     setIsFetching(false);
   }
 
@@ -314,6 +419,14 @@ export default function DashboardPage() {
                   onClick={() => startFetch(true)}
                 >
                   ↻ Forzar actualización
+                </button>
+              )}
+              {hasCachedData && isPatchEnabled !== false && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={patchMissing}
+                >
+                  ⬡ Completar faltantes
                 </button>
               )}
               {isDemoEnabled !== false && (
