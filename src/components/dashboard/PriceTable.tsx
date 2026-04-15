@@ -46,7 +46,6 @@ export default function PriceTable({ results, currency }: PriceTableProps) {
     dates.forEach((d) => {
       const prices = results.map((h) => h.prices.find((p) => p.date === d)?.price ?? null);
       const valid = prices.filter((p) => p != null) as number[];
-      if (valid.length === 0) return;
       const sp = valid.length > 1 ? Math.max(...valid) - Math.min(...valid) : '';
       rowData.push([d, ...prices.map((p) => p ?? ''), sp]);
     });
