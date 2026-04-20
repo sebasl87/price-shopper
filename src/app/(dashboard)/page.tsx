@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
+import { useAuth } from "@/hooks/useAuth";
 import HotelList from "@/components/dashboard/HotelList";
 import StatsBar from "@/components/dashboard/StatsBar";
 import PriceChart from "@/components/dashboard/PriceChart";
@@ -48,6 +50,8 @@ const CUR_SYM: Record<string, string> = {
 
 export default function DashboardPage() {
   const qc = useQueryClient();
+  const { data: authUser } = useAuth();
+  const isAdmin = authUser?.email === 'sebastian.loguzzo@gmail.com';
 
   const [currency, setCurrency] = useState("USD");
   const [adults, setAdults] = useState("2");
@@ -465,6 +469,25 @@ export default function DashboardPage() {
             </>
           )}
         </div>
+
+        {/* Genius Calibration link — admin only */}
+        {isAdmin && !isFetching && (
+          <Link
+            href="/calibracion"
+            style={{
+              display: 'block',
+              padding: '7px 10px',
+              borderRadius: '6px',
+              border: '1px solid var(--border)',
+              color: 'var(--muted)',
+              fontSize: '11px',
+              textDecoration: 'none',
+              textAlign: 'center',
+            }}
+          >
+            ◎ Calibrar Genius
+          </Link>
+        )}
 
         {/* Progress */}
         {isFetching && (
