@@ -47,7 +47,7 @@ export default function GeniusCalibrationPage({ results, currency, snapshotDate 
   const [savedOk, setSavedOk] = useState(false);
 
   const sym = CUR_SYM[currency] ?? '$';
-  const competitorHotels = HOTELS.filter((h) => !h.mine);
+  const competitorHotels = HOTELS;
   const dates = pickDates(results);
 
   function setInput(hotelId: string, date: string, val: string) {
