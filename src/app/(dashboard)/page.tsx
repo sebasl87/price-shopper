@@ -11,6 +11,7 @@ import PriceChart from "@/components/dashboard/PriceChart";
 import PriceTable from "@/components/dashboard/PriceTable";
 import ProgressLog from "@/components/dashboard/ProgressLog";
 import { usePrices } from "@/hooks/usePrices";
+import { useGeniusDiscountsMap } from "@/hooks/useGeniusDiscounts";
 import { HOTELS } from "@/lib/hotels";
 import { extractPrice } from "@/lib/extractPrice";
 import type {
@@ -333,9 +334,22 @@ export default function DashboardPage() {
     setIsDemo(true);
   }
 
-  const displayResults = liveResults.length
+  const geniusMap = useGeniusDiscountsMap();
+
+  const rawResults = liveResults.length
     ? liveResults
     : (data?.snapshot?.results ?? []);
+  const displayResults = rawResults.map((h) => {
+    const ratio = geniusMap[h.id];
+    if (!ratio) return h;
+    return {
+      ...h,
+      prices: h.prices.map((p) => ({
+        ...p,
+        price: p.price != null ? Math.round(p.price * ratio) : null,
+      })),
+    };
+  });
   const displayCurrency = liveResults.length
     ? currency
     : (data?.snapshot?.currency ?? currency);
