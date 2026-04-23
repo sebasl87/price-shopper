@@ -1,0 +1,35 @@
+name: Auto Calibrate Genius Discounts
+
+on:
+  schedule:
+    # Daily at 10:00 UTC = 07:00 Argentina (UTC-3)
+    - cron: '0 10 * * *'
+  workflow_dispatch: # allow manual trigger from GitHub Actions tab
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install project dependencies
+        run: npm ci
+
+      - name: Install Playwright + Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Run genius calibration
+        env:
+          BOOKING_GENIUS_COOKIES: ${{ secrets.BOOKING_GENIUS_COOKIES }}
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/calibrate-genius.mjs

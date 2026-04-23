@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { extractPrice } from '@/lib/extractPrice';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -7,6 +8,7 @@ export async function GET(req: NextRequest) {
   const departure_date = searchParams.get('departure_date');
   const rec_guest_qty = searchParams.get('rec_guest_qty') ?? '2';
   const currency_code = searchParams.get('currency_code') ?? 'USD';
+  const debug = searchParams.get('debug') === '1';
 
   if (!hotel_id || !arrival_date || !departure_date) {
     return NextResponse.json(
@@ -40,6 +42,19 @@ export async function GET(req: NextRequest) {
     });
 
     const data = await response.json();
+
+    // Log structure when price extraction fails, to help diagnose API changes
+    const extracted = extractPrice(data, true);
+    if (extracted === null) {
+      const topKeys = data && typeof data === 'object' ? Object.keys(data) : typeof data;
+      console.warn(`[rooms] price=null hotel=${hotel_id} date=${arrival_date} status=${response.status} topKeys=${JSON.stringify(topKeys)}`);
+    }
+
+    // ?debug=1 returns full raw response for inspection
+    if (debug) {
+      return NextResponse.json({ _extracted: extracted, _raw: data }, { status: response.status });
+    }
+
     return NextResponse.json(data, { status: response.status });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
