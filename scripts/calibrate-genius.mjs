@@ -64,6 +64,30 @@ function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
 
+/**
+ * Normalize cookies exported from browsers/extensions so Playwright accepts them.
+ * Different exporters use different sameSite values (e.g. "no_restriction", "unspecified").
+ */
+function normalizeCookies(raw) {
+  const sameSiteMap = {
+    no_restriction: 'None',
+    none: 'None',
+    lax: 'Lax',
+    strict: 'Strict',
+    unspecified: 'Lax',
+  };
+  return raw.map(c => ({
+    name: c.name,
+    value: c.value,
+    domain: c.domain ?? '.booking.com',
+    path: c.path ?? '/',
+    expires: c.expirationDate ?? c.expires ?? -1,
+    httpOnly: c.httpOnly ?? false,
+    secure: c.secure ?? false,
+    sameSite: sameSiteMap[(c.sameSite ?? '').toLowerCase()] ?? 'Lax',
+  }));
+}
+
 // ── Price extraction ──────────────────────────────────────────────────────────
 
 /**
@@ -136,7 +160,7 @@ async function main() {
     extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
   });
 
-  await context.addCookies(cookies);
+  await context.addCookies(normalizeCookies(cookies));
   const page = await context.newPage();
   const updates = [];
 
